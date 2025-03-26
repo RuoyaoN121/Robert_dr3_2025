@@ -1,0 +1,47 @@
+BootStrap: docker
+From: python:3.10.13-bookworm
+
+%post
+  apt-get update -y
+  apt-get install -y build-essential automake autoconf libtool gfortran git libsuitesparse-dev libopenmpi3 libopenmpi-dev
+  apt-get clean
+  export TEMPO2=/usr/local/share/tempo2
+  mkdir -p $TEMPO2
+  cd /opt
+  git clone https://bitbucket.org/psrsoft/tempo2.git
+  cd tempo2
+  export CC=mpicc
+  export CPP="mpicc -E"
+  export CXX=mpicxx
+  export F77=mpif77
+  export FC=mpif77
+  
+  ./bootstrap
+  cp -r T2runtime/* /usr/local/share/tempo2/
+  export TEMPO2=/usr/local/share/tempo2/
+  
+  ./configure --prefix=/usr/local
+  make && make install
+
+  cd $TEMPO2/earth
+  sh update_eop.sh
+  cd -
+  cd $TEMPO2/clock
+  wget https://archive-gw-1.kat.ac.za/public/tfr/mk2utc.clk
+  mv mk2utc.clk.1 mk2utc.clk
+  ls 
+  cd -
+  
+  pip install bilby glob2 matplotlib numpy dill scipy corner ptmcmcsampler mpi4py pandas ChainConsumer schwimmbad argparse dynesty
+  
+  pip install git+https://github.com/nanograv/enterprise@dev
+  pip install git+https://github.com/vallis/libstempo.git --install-option="--with-tempo2=$TEMPO2"
+
+  pip install git+https://github.com/nanograv/enterprise_extensions@master
+
+#  cp for_apptainer/tai2tt_bipm2020.clk $TEMPO2/clock/tai2tt_bipm2020.clk
+
+%environment
+  export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+  export TEMPO2=/usr/local/share/tempo2
+  

@@ -4,10 +4,11 @@ import glob
 import sys
 
 # Define base directory
-base_dir = "/fred/oz002/users/mbailes/astral/timing2025"
+base_dir = "/fred/oz002/users/mbailes/astral/timing2025/"
+output_dir = os.path.join(base_dir, "partim_obs_2")
 
 # Read pulsar names from psr_list.txt
-pulsar_file = os.path.join(base_dir, "psr_list.txt")
+pulsar_file = os.path.join(base_dir, "psr_list2.txt")
 try:
     with open(pulsar_file, "r") as f:
         psrnames = [line.strip() for line in f if line.strip()]  # Remove empty lines and spaces
@@ -21,7 +22,7 @@ par_source_dir = "/fred/oz002/users/mmiles/MPTA_GW/partim_frank/pp_8"
 failed_obs = []
 # Process each pulsar
 for psrname in psrnames:
-    pulsar_dir = os.path.join(base_dir, psrname)
+    pulsar_dir = os.path.join(output_dir, psrname)
     os.makedirs(pulsar_dir, exist_ok=True)
     print(f"Processing {psrname}...")
 

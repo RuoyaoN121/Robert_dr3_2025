@@ -1,15 +1,15 @@
 #!/bin/csh
 
 echo code to calculate reduced chi^2 for every observation
-echo in the $TIMING/partim_obs directory
+echo in the $TIMING/partim_obs_2 directory
 echo fit for DM as well
 
-setenv TEMPO2_CLOCK_DIR /fred/oz002/users/mbailes/astral/tempo2/clock/
+# setenv TEMPO2_CLOCK_DIR /fred/oz002/users/mbailes/astral/tempo2/clock/
 
 # go to source of truth and copy all of the files pulsar by pulsar
 
 
-cd $TIMING/partim_obs
+cd $TIMING/partim_obs_2
 set npsr = `ls | grep J | wc -l`
 
 foreach pulsar (`ls | grep J`)

@@ -64,7 +64,7 @@ class compare:
         dir1_unique = {}
         dir2_unique = {}
         for psr in self.pulsars:
-            tim1 = os.path.join(self.dir1_path, psr, f"{psr}.tim")
+            tim1 = os.path.join(self.dir1_path, f"{psr}.tim")
             tim2 = os.path.join(self.dir2_path, f"{psr}.tim") # not in subfolders for matt's data
 
             dates1 = self.extract_dates(tim1)

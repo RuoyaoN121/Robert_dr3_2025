@@ -3,12 +3,15 @@ import re
 
 class TimFileProcessor:
     def __init__(self, apply_epoch_cut=True, apply_snr_cut=True, apply_bw_cut=False, 
-                 apply_length_cut=False, epochs=None, snr_cutoff=10, bw_cutoff=20, 
-                 length_cutoff=128):
+                 apply_length_cut=False, apply_TOAerr_cut = False, apply_date_cut=False, epochs=None, snr_cutoff=10, bw_cutoff=20, 
+                 length_cutoff=128, save_deleted=True):
         self.apply_epoch_cut = apply_epoch_cut
         self.apply_snr_cut = apply_snr_cut
         self.apply_bw_cut = apply_bw_cut
         self.apply_length_cut = apply_length_cut
+        self.apply_TOAerr_cut = apply_TOAerr_cut
+        self.apply_date_cut = apply_date_cut
+        self.save_deleted = save_deleted
         self.epochs = epochs or []
         self.epoch_pattern = re.compile("|".join(map(re.escape, self.epochs))) if self.epochs else None
         self.snr_cutoff = snr_cutoff
@@ -16,6 +19,33 @@ class TimFileProcessor:
         self.length_cutoff = length_cutoff
 
     def line_passes_filters(self, line):
+        # Skip comment lines
+        if line.strip().startswith("C") or line.strip() == "":
+            return True
+        
+        # TOA Error cut
+        threshold_us = 10
+        parts = line.strip().split()      
+        try:
+            if len(parts) >4:
+                # Convert error from ms to microseconds
+                error_us = float(parts[3])
+                if error_us >= threshold_us:
+                    return False
+        except ValueError:
+            # If error parsing fails, keep the line unchanged
+            return False
+        
+            
+        # 2025 date filter
+        #date_pattern = re.compile(r'2025[-/]?\d{1,2}[-/]?\d{1,2}')
+        #if date_pattern.search(line):
+        #    return False
+        
+        date_pattern = re.compile(r'2019[-/]?\d{1,2}[-/]?\d{1,2}')
+        if date_pattern.search(line):
+            return False
+
         # Epoch filter
         if self.apply_epoch_cut and self.epoch_pattern and self.epoch_pattern.search(line):
             return False
@@ -64,54 +94,67 @@ class TimFileProcessor:
             lines = f_in.readlines()
 
         filtered = [ln for ln in lines if self.line_passes_filters(ln)]
-        deleted = [ln for ln in lines if not self.line_passes_filters(ln)]
-
+        
         os.makedirs(psr_dest_dir, exist_ok=True)
-        os.makedirs(psr_dest_dir_deleted, exist_ok=True)
-
+        
         tim_out = os.path.join(psr_dest_dir, f"{psrname}.tim")
-        tim_out_deleted = os.path.join(psr_dest_dir_deleted, f"{psrname}.tim")
 
+        #write Emax
+        write_emax = False
         with open(tim_out, 'w+') as f_out1:
-            # Add the EMAX 10 line at the beginning of the file
-            f_out1.write("EMAX 10\n")
+            if write_emax:
+                # Add the EMAX 10 line at the beginning of the file
+                f_out1.write("EMAX 10\n")
             f_out1.writelines(filtered)
             print(f"Processed: {tim_path}")
 
-        with open(tim_out_deleted, 'w+') as f_out2:
-            f_out2.writelines(deleted)
-            print(f"Processed (deleted): {tim_path}")
+        # Only process deleted lines if save_deleted is True
+        if self.save_deleted:
+            deleted = [ln for ln in lines if not self.line_passes_filters(ln)]
+            os.makedirs(psr_dest_dir_deleted, exist_ok=True)
+            tim_out_deleted = os.path.join(psr_dest_dir_deleted, f"{psrname}.tim")
+            with open(tim_out_deleted, 'w+') as f_out2:
+                f_out2.writelines(deleted)
+                print(f"Processed (deleted): {tim_path}")
 
 # Main execution
 if __name__ == "__main__":
     base_dir = "/fred/oz002/users/mbailes/astral/timing2025"
-    pulsar_file = os.path.join(base_dir, "psr_list.txt")
-    partim_dir = os.path.join(base_dir, "partim_v3")
-    out_dir_filtered = os.path.join(base_dir, "partim_obs")
-    out_dir_deleted = os.path.join(base_dir, "partim_deleted")
+    pulsar_file = os.path.join(base_dir, "psr_list2.txt")
+    partim_dir = os.path.join(base_dir, "GWB_search_2")
+    out_dir_filtered = os.path.join(base_dir, "GWB_search_2_no2019")
+    out_dir_deleted = os.path.join(base_dir, "deleted_junk1")
     epochs_to_remove = ["2021-06-13", "2021-06-21", "2020-01-21", "2021-06-22"]
 
+    # Set this to False if you don't want to save deleted lines
+    save_deleted_files = False
+
     os.makedirs(out_dir_filtered, exist_ok=True)
-    os.makedirs(out_dir_deleted, exist_ok=True)
+    # Only create the deleted directory if we're saving deleted files
+    if save_deleted_files:
+        os.makedirs(out_dir_deleted, exist_ok=True)
 
     processor = TimFileProcessor(
         apply_epoch_cut=True,
         apply_snr_cut=True,
         apply_bw_cut=True,  # Set to True if needed
         apply_length_cut=True,  # Enable the length filter
+        apply_TOAerr_cut=True,  # Enable the TOA error filter
+        apply_date_cut=True,  # Enable the date filter
         epochs=epochs_to_remove,
         snr_cutoff=10,
         bw_cutoff=20,
-        length_cutoff=128  # Set the minimum length value
+        length_cutoff=128,  # Set the minimum length value
+        save_deleted=save_deleted_files  # Control whether to save deleted lines
     )
 
     with open(pulsar_file, "r") as f:
         pulsars = [line.strip() for line in f if line.strip()]
 
     for psrname in pulsars:
-        tim_file_path = os.path.join(partim_dir, psrname, f"{psrname}.tim")
-        psr_dest_dir = os.path.join(out_dir_filtered, psrname)
-        psr_dest_dir_deleted = os.path.join(out_dir_deleted, psrname)
+        tim_file_path = os.path.join(partim_dir, f"{psrname}.tim")
+        psr_dest_dir = os.path.join(out_dir_filtered)
+        psr_dest_dir_deleted = os.path.join(out_dir_deleted, psrname) if save_deleted_files else None
         processor.process_tim_file(tim_file_path, psr_dest_dir, psr_dest_dir_deleted)
 
     print("Processing complete!")
